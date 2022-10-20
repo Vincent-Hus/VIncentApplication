@@ -4,8 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data.SqlClient;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Web;
 using static VIncentApplication.Models.Util;
 
@@ -363,9 +361,14 @@ namespace VIncentApplication.Models
                 });
             }
         }
+        /// <summary>
+        /// session使用者是否喜歡此文章
+        /// </summary>
+        /// <param name="ArtID"></param>
+        /// <returns></returns>
         public bool UserLikeThis(int ArtID)
         {
-            string strSql = " Select 1 from [ArtLike] where [ArtID]=@ArtID and [UserID]=@UserID and DisLike = 0 ";
+            string strSql = " Select 1 from [ArtLike] where [ArtID]=@ArtID and [UserID]=@UserID ";
             using(SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
             {
                 int resultCount = conn.QuerySingleOrDefault<int>(strSql, new
@@ -376,6 +379,11 @@ namespace VIncentApplication.Models
                 return resultCount > 0;
             }
         }
+        /// <summary>
+        /// 取得點讚數有快取拿快取 沒快取拿DB
+        /// </summary>
+        /// <param name="ArtID"></param>
+        /// <returns></returns>
         public int GetArtLikeNumber(int ArtID)
         {
             string ArtLikeKey = $"ArtLike_{ArtID}";
@@ -386,7 +394,9 @@ namespace VIncentApplication.Models
             }
             else
             {
-                return SelectArtLikeNumberDB(ArtID);
+                int DBLikes = SelectArtLikeNumberDB(ArtID);
+                redis.StringSet(ArtLikeKey, DBLikes, TimeSpan.FromSeconds(60));
+                return DBLikes;
             }
 
         }
@@ -397,7 +407,7 @@ namespace VIncentApplication.Models
         /// <returns></returns>
         private int SelectArtLikeNumberDB(int ArtID)
         {
-            string strSql = " Select Count(*) as LikeNumber from [ArtLike] where [ArtID]=@ArtID and DisLike = 0 ";
+            string strSql = " Select Count(*) as LikeNumber from [ArtLike] where [ArtID]=@ArtID ";
             using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
             {
                 Art result = conn.QuerySingle<Art>(strSql, new
@@ -418,7 +428,6 @@ namespace VIncentApplication.Models
             string ArtLikeKey = $"ArtLike_{ArtID}";
             try
             {
-                
                 if (UserLikeThis(ArtID))
                 {
                     DeleteArtLikeDB(ArtID);
@@ -438,6 +447,10 @@ namespace VIncentApplication.Models
             }
 
         }
+        /// <summary>
+        /// 新增點讚數至DB
+        /// </summary>
+        /// <param name="ArtID"></param>
         private void InsertArtLikeDB(int ArtID)
         {
             string strSql = " Insert into [ArtLike] ([UserID],[ArtID],[CreateTime]) values (@UserID,@ArtID,@CreateTime) ";
@@ -451,18 +464,31 @@ namespace VIncentApplication.Models
                 });
             }
         }
+        /// <summary>
+        /// 刪除DB點讚數
+        /// </summary>
+        /// <param name="ArtID"></param>
         private void DeleteArtLikeDB(int ArtID)
         {
             string strSql = "Delete [ArtLike]  Where [ArtID] = @ArtID and [UserID] = @UserID ";
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            try
             {
-                Art result = conn.QuerySingle<Art>(strSql, new
+                using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
                 {
-                    ArtID = ArtID,
-                    UserID = HttpContext.Current.Session["UserID"],
-                    Updatetime = DateTime.Now
-                }) ;
+                    Art result = conn.QuerySingle<Art>(strSql, new
+                    {
+                        ArtID = ArtID,
+                        UserID = HttpContext.Current.Session["UserID"],
+                        Updatetime = DateTime.Now
+                    });
+                }
             }
+            catch (Exception ex)
+            {
+                Util util = new Util();
+                util.DeBug(ex.Message);
+            }
+
         }
     }
 }
