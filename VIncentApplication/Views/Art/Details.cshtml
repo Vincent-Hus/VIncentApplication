@@ -1,0 +1,180 @@
+﻿@model VIncentApplication.Models.Art
+
+
+<h3>@Html.DisplayFor(model => model.Title)</h3>
+<h4> @Html.DisplayNameFor(model => model.UserID) : @Html.DisplayFor(model => model.UserID)</h4>
+<h5>@Html.DisplayNameFor(model => model.CreateTime) : @Html.DisplayFor(model => model.CreateTime)</h5>
+<label>@Html.DisplayNameFor(model => model.ClicksNumber) : @Html.DisplayFor(model => model.ClicksNumber)</label>
+<hr />
+<div class="col-lg-offset-1">
+
+    <div style="margin-bottom:50px">
+        @Html.DisplayFor(model => model.ArtContent)
+    </div>
+
+    <div>
+        @Html.DisplayNameFor(model => model.LikeNumber): @Html.DisplayFor(model => model.LikeNumber)
+        @if (Model.Like)
+        {
+            <input type="button" value="收回讚" class="btn" onclick="Like()" /> }
+        else
+        {
+            <input type="button" value="讚" class="btn" onclick="Like()" />
+        }
+
+        @if (Model.UpdateTime.HasValue)
+        {
+            <div style="float:right;text-align:right">
+                @Html.DisplayNameFor(model => model.UpdateTime): @Html.DisplayFor(model => model.UpdateTime)
+            </div>
+        }
+    </div>
+
+
+
+</div>
+<hr />
+<h3>留言</h3>
+@for (int i = 0; i < Model.Comment.Count; i++)
+{
+    <div class="col-xs-12" style="border-bottom:groove">
+        @if (Model.Comment[i].UpdateTime.HasValue)
+        {
+            <label name="CommentContent">@Model.Comment[i].UserID : @Model.Comment[i].CommentContent (已編輯)</label>
+        }
+        else
+        {
+            <label name="CommentContent">@Model.Comment[i].UserID : @Model.Comment[i].CommentContent</label>
+        }
+        @if (Session["UserID"].ToString() == Model.Comment[i].UserID)
+        {
+
+            <input name="EditButton" type="button" value="編輯" onclick="Edit(@i)" style="float: right; margin:2px 1px 4px 1px " />
+            <input name="DeleteButton" type="button" value="刪除" class="btn-danger" style="float: right; margin: 2px 1px 4px 1px " onclick="DeleteComment(@Model.Comment[i].CommentID)" />
+        }
+        else
+        {
+            <input name="EditButton" type="hidden" value="編輯" disabled style="float: right; margin:2px 1px 4px 1px " />
+            <input name="DeleteButton" type="hidden" value="刪除" disabled class="btn-danger" style="float: right; margin: 2px 1px 4px 1px " />
+        }
+
+        <label name="CommentTime" style="float:right">@Model.Comment[i].CreateTime</label>
+
+        <textarea name="EditTextarea" hidden style="width:100%;height:100px;border-radius:5px;margin:10px">@Model.Comment[i].CommentContent</textarea>
+        <input name="EditSave" hidden type="button" value="儲存編輯" onclick="EditSave(@i,@Model.Comment[i].CommentID)" id="SaveEditButton" style="float: right; margin: 2px 1px 4px 1px; " />
+        <input name="CancleButton" hidden type="button" value="取消" onclick="EditCancle(@i)" id="SaveEditButton" style="float: right; margin: 2px 1px 4px 1px;" />
+
+    </div>
+}
+
+
+
+<div>
+    <textarea name="CommentContent" placeholder="請輸入留言" id="CommentContent" style="width:100%;height:100px;border-radius:5px;margin:10px"></textarea>
+    <br />
+    <button class="btn" style="margin:10px" onclick="Comment()">發表留言</button>
+</div>
+
+
+<script>
+    function Comment() {
+        $.ajax({
+            type: "Post",
+            url: "@Url.Action("Create","Comment")",
+            data: { ArtID:@Model.ArtID, CommentContent: $("#CommentContent").val() },
+            success: function (data) {
+                window.location.reload()
+            },
+            error: function (data) {
+                alert(data.responseJSON)
+            }
+
+        })
+
+    }
+
+        function Like() {
+        $.ajax({
+            type: "Post",
+            url: "@Url.Action("Like","Art")",
+            data: { ArtID:@Model.ArtID},
+            success: function (data) {
+                window.location.reload()
+            },
+            error: function (data) {
+                alert(data.responseJSON)
+            }
+
+        })
+
+    }
+
+    function DeleteComment(CommentID) {
+        if (confirm("確定刪除")) {
+            $.ajax({
+                type: "Post",
+                url: "@Url.Action("Delete","Comment")",
+                data: { CommentID: CommentID },
+                success: function () {
+                    alert("刪除完成");
+                    window.location.reload();
+                },
+                error: function () { alert("刪除失敗") }
+            })
+        }
+    }
+    function Edit(i) {
+        $("[name ='EditTextarea']").eq(i).show()
+        $("[name ='EditSave']").eq(i).show()
+        $("[name ='CancleButton']").eq(i).show()
+        $("[name ='CommentContent']").eq(i).hide()
+        $("[name ='EditButton']").eq(i).hide()
+        $("[name ='CommentTime']").eq(i).hide()
+        $("[name ='DeleteButton']").eq(i).hide()
+        $("[name = 'EditButton']").attr('disabled', true);
+    }
+    function EditSave(i, CommentID) {
+        $("[name ='EditTextarea']").eq(i).hide()
+        $("[name ='EditSave']").eq(i).hide()
+        $("[name ='CancleButton']").eq(i).hide()
+        $("[name ='CommentContent']").eq(i).show()
+        $("[name ='EditButton']").eq(i).show()
+        $("[name ='CommentTime']").eq(i).show()
+        $("[name ='DeleteButton']").eq(i).show()
+        $("[name = 'EditButton']").attr('disabled', false);
+        $.ajax({
+                type: "Post",
+                url: "@Url.Action("Edit","Comment")",
+            data: { CommentID: CommentID, CommentContent: $("[name ='EditTextarea']").eq(i).val() },
+                success: function () {
+                    alert("修改完成");
+                    window.location.reload();
+                },
+                error: function () { alert("修改失敗") }
+        })
+    }
+        function EditCancle(i) {
+            $("[name ='EditTextarea']").eq(i).hide()
+            $("[name ='EditSave']").eq(i).hide()
+            $("[name ='CancleButton']").eq(i).hide()
+            $("[name ='CommentContent']").eq(i).show()
+            $("[name ='EditButton']").eq(i).show()
+            $("[name ='CommentTime']").eq(i).show()
+            $("[name ='DeleteButton']").eq(i).show()
+            $("[name = 'EditButton']").attr('disabled', false);
+        }
+</script>
+@if (Model.UserID == Session["UserID"].ToString())
+{
+    <p>
+        @Html.ActionLink("編輯", "Edit", new { ArtID = Model.ArtID }) |
+        @Html.ActionLink("返回列表", "Index")
+    </p>
+}
+else
+{
+    <p>
+        @Html.ActionLink("返回列表", "Index")
+    </p>
+}
+

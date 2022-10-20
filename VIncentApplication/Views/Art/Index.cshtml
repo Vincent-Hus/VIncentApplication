@@ -1,0 +1,89 @@
+﻿@using VIncentApplication.Models;
+@model VIncentApplication.Models.ArtView
+
+
+@using (Html.BeginForm("Index", "Art", FormMethod.Post))
+{
+    @Html.TextBoxFor(m => m.KeyWord, new { @style = "width:300px;margin:20px 1px 5px 0px" })
+
+    <input type="submit" value="查詢" class="btn btn-default" />
+
+    <table cellspacing="0" cellpadding="0" class="table">
+        <thead>
+            <tr>
+                <th>文章標題</th>
+                <th>作者</th>
+                <th>建立時間</th>
+                @if (Session["UserID"] != null)
+                {
+                    <th>動作</th>
+                }
+                </tr>
+        </thead>
+        <tbody>
+            @if (Model.Arts.Count != 0)
+            {
+                for (int i = 0; i < Model.Arts.Count; i++)
+                {
+                    <tr>
+                        <td>@Html.DisplayFor(m => m.Arts[i].Title)</td>
+                        <td>@Html.DisplayFor(m => m.Arts[i].UserID)</td>
+                        <td>@Html.DisplayFor(m => m.Arts[i].CreateTime)</td>
+                        @if (Session["UserID"] != null)
+                        {
+                            if (Session["UserID"].ToString() == Model.Arts[i].UserID)
+                            {
+                                <td>
+                                    @Html.ActionLink("內容", "Details", new { ArtID = Model.Arts[i].ArtID })
+                                    |
+                                    @Html.ActionLink("編輯", "Edit", new { ArtID = Model.Arts[i].ArtID })
+                                    |
+                                    <button class="btn-link" onclick="DeleteArt(@Model.Arts[i].ArtID)">刪除</button>
+                                </td>
+                            }
+                            else
+                            {
+                                <td>
+                                    @Html.ActionLink("內容", "Details", new { ArtID = Model.Arts[i].ArtID })
+                                </td>
+                            }
+
+                        }
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td align="center" colspan="5">查無資料</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+<p>
+    @Html.ActionLink("建立新文章", "Create")
+</p>
+
+<script>
+    function DeleteArt(ArtID) {
+        if (confirm("確定刪除?")) {
+        $.ajax({
+            type: "Post",
+            url:"@Url.Action("Delete","Art")",
+            data: { ArtID: ArtID },
+            success: function () {alert("刪除完成")},
+            error: function () {alert("刪除失敗")}
+        })
+        }
+    }
+</script>
+
+
+@if (TempData["CreateResult"] != null)
+{
+    <script>
+        var message = @Html.Raw(Json.Encode(TempData["CreateResult"]));
+        alert(message);
+    </script>
+}
