@@ -13,24 +13,24 @@ namespace VIncentApplication.Models
         /// <summary>
         /// 確認是否為登入中的使用者
         /// </summary>
-        public bool IsCorrectUser(string UserID)
+        public bool IsCorrectUser(string userId)
         {
-            if (string.IsNullOrWhiteSpace(UserID))
+            if (string.IsNullOrWhiteSpace(userId))
             {
                 return false;
             }
             else
             {
-                return HttpContext.Current.Session["UserID"].ToString() == UserID;
+                return HttpContext.Current.Session["UserID"].ToString() == userId;
             }
 
         }
 
-        public void DeBug(string Message)
+        public void DeBug(string message)
         {
             if (Environment.UserInteractive)
             {
-                System.Diagnostics.Debug.WriteLine(Message);
+                System.Diagnostics.Debug.WriteLine(message);
             }
         }
 

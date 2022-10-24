@@ -13,11 +13,11 @@ namespace VIncentApplication.Controllers
     //TODO: 表單後臺驗證
     public class ArtController : Controller
     {
-        public ActionResult Edit(int ArtID)
+        public ActionResult Edit(int artid)
         {
 
             ArtDataAccess da = new ArtDataAccess();
-            Art result = da.GetArt(ArtID);
+            Art result = da.GetArt(artid);
             return View(result);
         }
         [HttpPost]
@@ -61,19 +61,19 @@ namespace VIncentApplication.Controllers
             }
         }
 
-        public ActionResult Details(int? ArtID)
+        public ActionResult Details(int? artId)
         {
             
-            if (ArtID.HasValue)
+            if (artId.HasValue)
             {
-                int HasArtID = Convert.ToInt32(ArtID);
-                ArtDataAccess ArtData = new ArtDataAccess();
-                CommentDataAccess commentData = new CommentDataAccess();
-                Art res = ArtData.GetArt(HasArtID);
-                res.Comment = commentData.GetCommentList(HasArtID).ToList();
-                res.ClicksNumber = ArtData.GetClicksNumber(HasArtID);
-                res.Like = ArtData.UserLikeThis(HasArtID);
-                res.LikeNumber = ArtData.GetArtLikeNumber(HasArtID);
+                int hasartid = Convert.ToInt32(artId);
+                ArtDataAccess artdata = new ArtDataAccess();
+                CommentDataAccess commentdata = new CommentDataAccess();
+                Art res = artdata.GetArt(hasartid);
+                res.Comment = commentdata.GetCommentList(hasartid).ToList();
+                res.ClicksNumber = artdata.GetClicksNumber(hasartid);
+                res.Like = artdata.UserLikeThis(hasartid);
+                res.LikeNumber = artdata.GetArtLikeNumber(hasartid);
                 return View(res);
             }
             else

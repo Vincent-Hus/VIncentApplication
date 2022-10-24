@@ -19,8 +19,8 @@ namespace VIncentApplication.Controllers
         {
             if (ModelState.IsValid)
             {
-                AccountDataAccess accountData = new AccountDataAccess();
-                if (accountData.IsLoginSuccess(login))
+                AccountDataAccess accountdata = new AccountDataAccess();
+                if (accountdata.IsLoginSuccess(login))
                 {
                     Session["UserID"] = login.UserID;
                     return RedirectToAction("Index", "Art");

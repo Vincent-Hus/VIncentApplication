@@ -435,12 +435,12 @@ namespace VIncentApplication.Models
                 if (UserLikeThis(artId))
                 {
                     DeleteArtLikeDB(artDb);
-                    redis.StringDecrement(artlikekey,1);
+                    redis.StringDecrement(artlikekey);
                 }
                 else
                 {
                     InsertArtLikeDB(artDb);
-                    redis.StringIncrement(artlikekey,1);
+                    redis.StringIncrement(artlikekey);
                 }
             }
             catch (Exception ex)
@@ -459,6 +459,7 @@ namespace VIncentApplication.Models
             string strsql = " Insert into [ArtLike] ([UserID],[ArtID],[CreateTime]) values (@UserID,@ArtID,@CreateTime) ";
             using (var conn = _util.GetSqlConnection())
             {
+                art.UserID = HttpContext.Current.Session["UserID"].ToString();
                 conn.Execute(strsql, art);
             }
         }
@@ -473,7 +474,8 @@ namespace VIncentApplication.Models
             {
                 using (var conn = _util.GetSqlConnection())
                 {
-                     conn.Execute(strsql, art);
+                    art.UserID = HttpContext.Current.Session["UserID"].ToString();
+                    conn.Execute(strsql, art);
                 }
             }
             catch (Exception ex)

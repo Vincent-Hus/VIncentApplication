@@ -26,9 +26,9 @@ namespace VIncentApplication.Models
 
             if (redis.StringGet(rediskey).IsNullOrEmpty)
             {
-                IEnumerable<Comment> commentDb = SelectCommentListDB(artId);
-                redis.StringSet(rediskey, JsonConvert.SerializeObject(commentDb), TimeSpan.FromSeconds(60));
-                return commentDb;
+                IEnumerable<Comment> commentdb = SelectCommentListDB(artId);
+                redis.StringSet(rediskey, JsonConvert.SerializeObject(commentdb), TimeSpan.FromSeconds(60));
+                return commentdb;
             }
             else
             {
@@ -92,15 +92,15 @@ namespace VIncentApplication.Models
 
         public string UpdateComment(Comment comment)
         {
-            Comment commentDb = GetComment(comment.CommentID);
-            if (!_util.IsCorrectUser(commentDb.UserID))
+            Comment commentdb = GetComment(comment.CommentID);
+            if (!_util.IsCorrectUser(commentdb.UserID))
             {
                 return "錯誤使用者";
             }
 
             try
             {
-                string rediskey = $"GetCommentList_{commentDb.ArtID}";
+                string rediskey = $"GetCommentList_{commentdb.ArtID}";
                 var redis = RedisConnectorHelper.Connection.GetDatabase();
                 UpdateCommentDB(comment);
                 redis.KeyDelete(rediskey);
