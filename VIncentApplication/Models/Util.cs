@@ -1,6 +1,8 @@
 ﻿using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Web;
 
@@ -13,7 +15,15 @@ namespace VIncentApplication.Models
         /// </summary>
         public bool IsCorrectUser(string UserID)
         {
-            return HttpContext.Current.Session["UserID"].ToString() == UserID;
+            if (string.IsNullOrWhiteSpace(UserID))
+            {
+                return false;
+            }
+            else
+            {
+                return HttpContext.Current.Session["UserID"].ToString() == UserID;
+            }
+
         }
 
         public void DeBug(string Message)
@@ -47,8 +57,17 @@ namespace VIncentApplication.Models
                 }
             }
 
-
         }
+        /// <summary>
+        /// 資料庫連線
+        /// </summary>
+        /// <returns></returns>
+        public SqlConnection GetSqlConnection()
+        {
+            SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString);
+            return conn;
+        }
+
         
     }
 }

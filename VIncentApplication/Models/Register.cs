@@ -33,6 +33,6 @@ namespace VIncentApplication.Models
         /// </summary>
         [Display(Name ="電子郵件")]
         public string Email { get; set; }
-
+        public DateTime CreateTime { get; set; }
     }
 }

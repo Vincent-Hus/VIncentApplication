@@ -18,6 +18,7 @@ namespace VIncentApplication.Models
         /// 文章內容
         /// </summary>
         [Required]
+        [MaxLength(250)]
         public string CommentContent { get; set; }
 
         /// <summary>
@@ -32,7 +33,6 @@ namespace VIncentApplication.Models
         /// <summary>
         /// 留言者
         /// </summary>
-        [Required]
         public string UserID { get; set; }
         /// <summary>
         /// 文章編號

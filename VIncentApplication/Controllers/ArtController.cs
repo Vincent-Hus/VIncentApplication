@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Mvc;
@@ -9,10 +10,12 @@ using static VIncentApplication.Models.Util;
 
 namespace VIncentApplication.Controllers
 {
+    //TODO: 表單後臺驗證
     public class ArtController : Controller
     {
         public ActionResult Edit(int ArtID)
         {
+
             ArtDataAccess da = new ArtDataAccess();
             Art result = da.GetArt(ArtID);
             return View(result);
@@ -20,11 +23,19 @@ namespace VIncentApplication.Controllers
         [HttpPost]
         public  ActionResult Edit(Art art) 
         {
-            ArtDataAccess da = new ArtDataAccess();
-            string message = da.UpdateArt(art);
-            TempData["UpdateResult"] = message;
-            
-            return RedirectToAction("Edit",art);
+            if (ModelState.IsValid)
+            {
+                ArtDataAccess da = new ArtDataAccess();
+                string message = da.UpdateArt(art);
+                TempData["UpdateResult"] = message;
+
+                return RedirectToAction("Edit", art);
+            }
+            else
+            {
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+            }
+
         }
 
         public ActionResult Index()
@@ -34,16 +45,25 @@ namespace VIncentApplication.Controllers
             result.Arts = da.GetArtList("").ToList();
             return View(result);
         }
+
         [HttpPost]
-        public ActionResult Index(ArtView PostData)
+        public ActionResult Index(ArtView postData)
         {
-            ArtDataAccess da = new ArtDataAccess();
-            PostData.Arts = da.GetArtList(PostData.KeyWord).ToList();
-            return View(PostData);
+            if (ModelState.IsValid)
+            {
+                ArtDataAccess da = new ArtDataAccess();
+                postData.Arts = da.GetArtList(postData.KeyWord).ToList();
+                return View(postData);
+            }
+            else
+            {
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+            }
         }
 
         public ActionResult Details(int? ArtID)
         {
+            
             if (ArtID.HasValue)
             {
                 int HasArtID = Convert.ToInt32(ArtID);
@@ -56,31 +76,49 @@ namespace VIncentApplication.Controllers
                 res.LikeNumber = ArtData.GetArtLikeNumber(HasArtID);
                 return View(res);
             }
-            return RedirectToAction("Index", "Art");
+            else
+            {
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+            }
+            
         }
 
         [HttpPost]
-        public ActionResult Like(int ArtID)
+        public ActionResult Like(int artId)
         {
-            if (string.IsNullOrEmpty(HttpContext.Session["UserID"].ToString()))
+            if (ModelState.IsValid)
             {
-                return RedirectToAction("Login", "Login");
+                if (string.IsNullOrEmpty(HttpContext.Session["UserID"].ToString()))
+                {
+                    return RedirectToAction("Login", "Login");
+                }
+                else
+                {
+                    ArtDataAccess artdata = new ArtDataAccess();
+                    artdata.LikeClick(artId);
+                    return new HttpStatusCodeResult(HttpStatusCode.OK);
+                }
             }
             else
             {
-                ArtDataAccess ArtData = new ArtDataAccess();
-                ArtData.LikeClick(ArtID);
-                return RedirectToAction("Details", "Art");
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
+
         }
 
         [HttpPost]
-        public ActionResult Delete(int ArtID)
+        public ActionResult Delete(int artId)
         {
-             ArtDataAccess da = new ArtDataAccess();
-             da.DeleteArt(ArtID);
-            return RedirectToAction("Index","Art");
-            
+            if (ModelState.IsValid)
+            {
+                ArtDataAccess da = new ArtDataAccess();
+                da.DeleteArt(artId);
+                return RedirectToAction("Index", "Art");
+            }
+            else
+            {
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+            }
         }
 
 
@@ -91,11 +129,17 @@ namespace VIncentApplication.Controllers
         [HttpPost]
         public ActionResult Create(Art art)
         {
-            
-            ArtDataAccess da = new ArtDataAccess();
-            string message = da.CreateArt(art);
-            TempData["CreateResult"] = message;
-            return RedirectToAction("Index");
+            if (ModelState.IsValid)
+            {
+                ArtDataAccess da = new ArtDataAccess();
+                string message = da.CreateArt(art);
+                TempData["CreateResult"] = message;
+                return RedirectToAction("Index");
+            }
+            else
+            {
+                return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
+            }
         }
     }
 }

@@ -18,7 +18,7 @@
                 {
                     <th>動作</th>
                 }
-                </tr>
+            </tr>
         </thead>
         <tbody>
             @if (Model.Arts.Count != 0)
@@ -61,9 +61,13 @@
         </tbody>
     </table>
 }
+
+@if (Session["UserID"] != null)
+{
 <p>
     @Html.ActionLink("建立新文章", "Create")
 </p>
+}
 
 <script>
     function DeleteArt(ArtID) {

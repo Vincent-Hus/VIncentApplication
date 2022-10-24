@@ -12,7 +12,6 @@ namespace VIncentApplication.Models
         /// <summary>
         /// 文章編號(自動編號)
         /// </summary>
-        [Required]
         public int ArtID { get; set; }
 
         /// <summary>
@@ -35,7 +34,6 @@ namespace VIncentApplication.Models
         /// <summary>
         /// 建立時間
         /// </summary>
-        [Required]
         [Display(Name ="發表時間")]
         public DateTime CreateTime { get; set; }
 
@@ -48,7 +46,6 @@ namespace VIncentApplication.Models
         /// <summary>
         /// 作者
         /// </summary>
-        [Required]
         [Display(Name ="作者")]
         public string UserID { get; set; }
         /// <summary>

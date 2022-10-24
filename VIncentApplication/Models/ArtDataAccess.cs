@@ -6,140 +6,146 @@ using System.Configuration;
 using System.Data.SqlClient;
 using System.Web;
 using static VIncentApplication.Models.Util;
+using System.Linq;
 
 namespace VIncentApplication.Models
 {
+    //TODO: dapper簡化
+    //TODO: REDIS資料修改後刪除key值
+    
     public class ArtDataAccess
     {
+        private readonly Util _util = new Util();
         /// <summary>
         /// 取得文章資料列表
         /// </summary>
-        public IEnumerable<Art> GetArtList(string KeyWord)
+        public IEnumerable<Art> GetArtList(string keyWord)
         {
 
-            if (string.IsNullOrEmpty(KeyWord))
+            if (string.IsNullOrEmpty(keyWord))
             {
-                KeyWord = "ArtList";
+                keyWord = "ArtList";
             }
 
-            var radis = RedisConnectorHelper.Connection.GetDatabase();
-            if (radis.StringGet(KeyWord).IsNullOrEmpty)
+            var redis = RedisConnectorHelper.Connection.GetDatabase();
+            
+            if (redis.StringGet(keyWord).IsNullOrEmpty)
             {
-                IEnumerable<Art> Art = SelectArtListDB(KeyWord);
-                radis.StringSet(KeyWord, JsonConvert.SerializeObject(Art), TimeSpan.FromSeconds(60));
-                return Art;
+                IEnumerable<Art> art = SelectArtListDB(keyWord);
+                redis.StringSet(keyWord, JsonConvert.SerializeObject(art), TimeSpan.FromSeconds(60));
+                   
+                return art;
             }
             else
             {
-                return JsonConvert.DeserializeObject<IEnumerable<Art>>(radis.StringGet(KeyWord));
+                return JsonConvert.DeserializeObject<IEnumerable<Art>>(redis.StringGet(keyWord));
             };
         }
         /// <summary>
         /// 取得文章單筆資料
         /// </summary>
-        public Art GetArt(int ArtID)
+        public Art GetArt(int artId)
         {
-            string strArtID = $"GetArt_{ArtID}";
+            string strartid = $"GetArt_{artId}";
             var radis = RedisConnectorHelper.Connection.GetDatabase();
-
-            if (radis.StringGet(strArtID).IsNullOrEmpty)
+            if (radis.StringGet(strartid).IsNullOrEmpty)
             {
-                Art art = SelectArtDb(ArtID);
-                radis.StringSet(strArtID, JsonConvert.SerializeObject(art), TimeSpan.FromSeconds(60));
+                Art art = SelectArtDb(artId);
+                radis.StringSet(strartid, JsonConvert.SerializeObject(art), TimeSpan.FromSeconds(60));
+                
                 return art;
                
             }
             else
             {
-                return JsonConvert.DeserializeObject<Art>(radis.StringGet(strArtID));
+                return JsonConvert.DeserializeObject<Art>(radis.StringGet(strartid));
             }
         }
         /// <summary>
         /// 取得文章點閱數
         /// </summary>
-        public long GetClicksNumber(int ArtID)
+        public long GetClicksNumber(int artId)
         {
-            string clicksKey = $"ArtClicks_{ArtID}"; //時間內點擊數 key值
-            string TimeKey = $"ArtTime_{ArtID}";     //最後寫入資料庫時間 key值
-            long clickNumbr;                         //時間內點擊數
-            long DbClickNumber;                      //DB點擊數
-            DateTime LastUpdateTime;                 //最後寫入資料庫時間
+            string clickskey = $"ArtClicks_{artId}"; //時間內點擊數 key值
+            string timekey = $"ArtTime_{artId}";     //最後寫入資料庫時間 key值
+            long clicknumbr;                         //時間內點擊數
+            long dbclicknumber;                      //DB點擊數
+            DateTime lastupdatetime;                 //最後寫入資料庫時間
             var redis = RedisConnectorHelper.Connection.GetDatabase();
 
             //時間內點擊數 有值:將值寫入REDIS 無值:帶昨日時間(讓判斷進入DB取資料),寫入REDIS
-            if (redis.StringGet(TimeKey).HasValue)
+            if (redis.StringGet(timekey).HasValue)
             {
-                LastUpdateTime = Convert.ToDateTime(redis.StringGet(TimeKey));
+                lastupdatetime = Convert.ToDateTime(redis.StringGet(timekey));
             }
             else
             {
-                LastUpdateTime = DateTime.Now.AddDays(-1);
-                redis.StringSet(TimeKey, LastUpdateTime.ToString(), TimeSpan.FromSeconds(60));
+                lastupdatetime = DateTime.Now.AddDays(-1);
+                redis.StringSet(timekey, lastupdatetime.ToString(), TimeSpan.FromSeconds(60));
             }
 
             //時間內若有點閱寫入REDIS ,時間內點擊數 +1後取值 ,超時將Redis暫存寫入資料庫並更新最後寫入時間 ,時間內點擊數 +1後取值
-            if (LastUpdateTime.AddSeconds(10) >= DateTime.Now)
+            if (lastupdatetime.AddSeconds(10) >= DateTime.Now)
             {
-                clickNumbr = redis.StringIncrement(clicksKey);
+                clicknumbr = redis.StringIncrement(clickskey);
             }
             else
             {
-                UpdateClicksNumber(ArtID, clicksKey);
-                redis.StringSet(TimeKey, DateTime.Now.ToString());
-                clickNumbr = redis.StringIncrement(clicksKey);
+                UpdateClicksNumber(artId, clickskey);
+                redis.StringSet(timekey, DateTime.Now.ToString());
+                clicknumbr = redis.StringIncrement(clickskey);
             }
             //取DB點閱數
-            DbClickNumber = GetDbClickNumber(ArtID);
+            dbclicknumber = GetDbClickNumber(artId);
 
 
-            return clickNumbr + DbClickNumber;
+            return clicknumbr + dbclicknumber;
         }
         /// <summary>
         /// 取DB點閱數寫入REDIS，回傳Reids內快取
         /// </summary>
-        /// <param name="ArtID"></param>
+        /// <param name="artId"></param>
         /// <returns></returns>
-        private long GetDbClickNumber(int ArtID)
+        private long GetDbClickNumber(int artId)
         {
 
-            string DbClicksKey = $"DbArtClicks_{ArtID}";//DB點擊數 KET值
+            string dbclicksnumber = $"DbArtClicks_{artId}";//DB點擊數 KET值
             var redis = RedisConnectorHelper.Connection.GetDatabase();
-            if (redis.StringGet(DbClicksKey).IsNullOrEmpty)
+            if (redis.StringGet(dbclicksnumber).IsNullOrEmpty)
             {
-                long ClicksNumber = SelectArtClicksNumberDB(ArtID);
-                 redis.StringSet(DbClicksKey, ClicksNumber);
-                 return ClicksNumber;
+                long clicksnumber = SelectArtClicksNumberDB(artId);
+                 redis.StringSet(dbclicksnumber, clicksnumber);
+                 return clicksnumber;
             }
             else
             {
-                return Convert.ToInt64(redis.StringGet(DbClicksKey));
+                return Convert.ToInt64(redis.StringGet(dbclicksnumber));
             }
         }
 
         /// <summary>
         /// 更新點閱數進資料庫歸零redis
         /// </summary>
-        /// <param name="ArtID"></param>
+        /// <param name="artId"></param>
         /// <returns></returns>
-        private bool UpdateClicksNumber(int ArtID, string clicksKey)
+        private bool UpdateClicksNumber(int artId, string clicksKey)
         {
-            string DbClicksKey = $"DbArtClicks_{ArtID}";//DB點擊數 KET值
+            string dbclickskey = $"DbArtClicks_{artId}";//DB點擊數 KET值
             var redis = RedisConnectorHelper.Connection.GetDatabase();
-            long ClicksNumber = Convert.ToInt64(redis.StringGet(clicksKey));//取redis時間內點擊數
-            long DbClickNumber = GetDbClickNumber(ArtID);  //取DB點擊數
+            long clicksnumber = Convert.ToInt64(redis.StringGet(clicksKey));//取redis時間內點擊數
+            long dbclicknumber = GetDbClickNumber(artId);  //取DB點擊數
             if (redis.StringSet(clicksKey, 0))//歸零Redis時間內點擊數
             {
                 try
                 {
-                    UpdateArtClicksNumberDB(ArtID, ClicksNumber, DbClickNumber); //時間內點擊數+DB點擊數 更新至DB
-                    redis.StringSet(DbClicksKey, ClicksNumber + DbClickNumber);    //更新DB點閱數後將Redis的DB點閱數更新
+                    UpdateArtClicksNumberDB(artId, clicksnumber, dbclicknumber); //時間內點擊數+DB點擊數 更新至DB
+                    redis.StringSet(dbclickskey, clicksnumber + dbclicknumber);    //更新DB點閱數後將Redis的DB點閱數更新
                     return true;
                     
                 }
                 catch (Exception ex)
                 {
-                    Util util = new Util();
-                    util.DeBug(ex.Message);
+                    _util.DeBug(ex.Message);
                     return false;
                 }
             };
@@ -153,20 +159,23 @@ namespace VIncentApplication.Models
 
         public string UpdateArt(Art art)
         {
-            Util util = new Util();
-            if (util.IsCorrectUser(art.UserID))
+            Art artDb = this.GetArt(art.ArtID);
+            if (!_util.IsCorrectUser(artDb.UserID))
             {
                 return "錯誤使用者";
             }
 
             try
             {
+                string strartid = $"GetArt_{art.ArtID}";
+                var redis = RedisConnectorHelper.Connection.GetDatabase();
                 UpdateArtDB(art);
+                redis.KeyDelete(strartid);
                 return "修改完成";
             }
             catch (Exception ex)
             {
-                util.DeBug(ex.Message);
+                _util.DeBug(ex.Message);
                 return ex.Message;
             }
         }
@@ -179,13 +188,15 @@ namespace VIncentApplication.Models
         {
             try
             {
+                string strartid = $"ArtList";
+                var redis = RedisConnectorHelper.Connection.GetDatabase();
                 InsertArtDb(art);
+                redis.KeyDelete(strartid);
                 return "新增完成";
             }
             catch (Exception ex)
             {
-                Util util = new Util();
-                util.DeBug(ex.Message);
+                _util.DeBug(ex.Message);
                 return "新增失敗";
             }
         }
@@ -194,22 +205,24 @@ namespace VIncentApplication.Models
         /// 刪除文章資料
         /// </summary>
 
-        public string DeleteArt(int ArtID)
+        public string DeleteArt(int artId)
         {
-            Art art = this.GetArt(ArtID);
-            Util util = new Util();
-            if (util.IsCorrectUser(art.UserID))
+            Art art = this.GetArt(artId);
+            if (!_util.IsCorrectUser(art.UserID))
             {
                 return "錯誤使用者";
             }
             try
             {
-                DeleteArtDB(ArtID);
+                string strartid = $"ArtList";
+                var redis = RedisConnectorHelper.Connection.GetDatabase();
+                DeleteArtDB(artId);
+                redis.KeyDelete(strartid);
                 return "刪除完成";
             }
             catch (Exception ex)
             {
-                util.DeBug(ex.Message);
+                _util.DeBug(ex.Message);
                 return "刪除失敗";
             }
 
@@ -218,24 +231,24 @@ namespace VIncentApplication.Models
         /// <summary>
         /// 取DB文章列表
         /// </summary>
-        /// <param name="KeyWord"></param>
+        /// <param name="keyWord"></param>
         /// <returns> IEnumerable<Art></returns>
-        private IEnumerable<Art> SelectArtListDB(string KeyWord)
+        private IEnumerable<Art> SelectArtListDB(string keyWord)
         {
-            string strSQL = @" select [ArtID],[Title], [ArtContent] ,[CreateTime],[UserID] from [Art] ";
-            strSQL += " Where VisibleStatus = 1";
+            string strsql = @" select [ArtID],[Title], [ArtContent] ,[CreateTime],[UserID] from [Art] ";
+            strsql += " Where VisibleStatus = 1";
 
-            if (KeyWord != "ArtList") //關鍵字
+            if (keyWord != "ArtList") //關鍵字
             {
-                strSQL += " And [Title] like '%'+@Title+'%' ";
+                strsql += " And [Title] like '%'+@Title+'%' ";
             }
-            strSQL += "Order by [CreateTime] asc";
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            strsql += "Order by [CreateTime] asc";
+            using (var conn = _util.GetSqlConnection())
             {
-                var result = conn.Query<Art>(strSQL,
+                var result = conn.Query<Art>(strsql,
                     new
                     {
-                        Title = KeyWord
+                        Title = keyWord
                     });
                 return result;
             }
@@ -243,41 +256,37 @@ namespace VIncentApplication.Models
         /// <summary>
         /// 取DB單筆文章
         /// </summary>
-        /// <param name="ArtID"></param>
+        /// <param name="artId"></param>
         /// <returns>Art</returns>
-        private Art SelectArtDb(int ArtID)
+        private Art SelectArtDb(int artId)
         {
-            string strSQL = @" Select [ArtID],[Title], [ArtContent] ,[CreateTime],[UserID],[UpdateTime] from [Art] ";
-            strSQL += " Where [VisibleStatus] = 1 ";
-            strSQL += " And [ArtID] = @ArtID ";
+            string strsql = @" Select [ArtID],[Title], [ArtContent] ,[CreateTime],[UserID],[UpdateTime],(select count(*) from [ArtLike] l where l.[ArtID] = a.[ArtID]) from [Art] a ";
+            strsql += " Where [VisibleStatus] = 1 ";
+            strsql += " And [ArtID] = @ArtID ";
 
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            using (var conn = _util.GetSqlConnection())
             {
-                Art result = conn.QuerySingleOrDefault<Art>(strSQL,
-                    new
-                    {
-                        ArtID = ArtID
-                    });
+                Art result = conn.QuerySingleOrDefault<Art>(strsql,new Art { ArtID = artId});
                 return result;
             }
         }
         /// <summary>
         /// 取DB點閱數
         /// </summary>
-        /// <param name="ArtID"></param>
+        /// <param name="artId"></param>
         /// <returns></returns>
-        private long SelectArtClicksNumberDB(int ArtID)
+        private long SelectArtClicksNumberDB(int artId)
         {
-            string strSQL = @" Select [ClicksNumber] from [Art] ";
-            strSQL += " Where [VisibleStatus] = 1 ";
-            strSQL += " And [ArtID] = @ArtID ";
+            string strsql = @" Select [ClicksNumber] from [Art] ";
+            strsql += " Where [VisibleStatus] = 1 ";
+            strsql += " And [ArtID] = @ArtID ";
 
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            using (var conn = _util.GetSqlConnection())
             {
-                Art result = conn.QuerySingleOrDefault<Art>(strSQL,
+                Art result = conn.QuerySingleOrDefault<Art>(strsql,
                     new
                     {
-                        ArtID = ArtID
+                        ArtID = artId
                     });
 
                 return result.ClicksNumber;
@@ -286,23 +295,23 @@ namespace VIncentApplication.Models
         /// <summary>
         /// ClicksNumber + DbClickNumber 更新至DB
         /// </summary>
-        /// <param name="ArtID"></param>
-        /// <param name="ClicksNumber"></param>
-        /// <param name="DbClickNumber"></param>
-        private void UpdateArtClicksNumberDB(int ArtID,long ClicksNumber,long DbClickNumber)
+        /// <param name="artId"></param>
+        /// <param name="clicksNumber"></param>
+        /// <param name="dbClickNumber"></param>
+        private void UpdateArtClicksNumberDB(int artId,long clicksNumber,long dbClickNumber)
         {
             string strSQL = @" Update [Art] set [ClicksNumber] =  @DBClicksNumber + @ClicksNumber ";
             strSQL += " Where [VisibleStatus] = 1 ";
             strSQL += " And [ArtID] = @ArtID ";
             
-              using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+              using (var conn = _util.GetSqlConnection())
               {
                   var result = conn.Execute(strSQL,
                       new
                       {
-                          ArtID = ArtID,
-                          ClicksNumber = ClicksNumber,
-                          DBClicksNumber = DbClickNumber
+                          ArtID = artId,
+                          ClicksNumber = clicksNumber,
+                          DBClicksNumber = dbClickNumber
                       });
               }
         }
@@ -312,18 +321,13 @@ namespace VIncentApplication.Models
         /// <param name="art"></param>
         private void UpdateArtDB(Art art)
         {
-            string strSQL = @" Update [Art] set [Title] = @Title , [ArtContent] = @ArtContent , [UpdateTime] = @UpdateTime ";
-            strSQL += " Where ArtID = @ArtID";
+            string strsql = @" Update [Art] set [Title] = @Title , [ArtContent] = @ArtContent , [UpdateTime] = @UpdateTime ";
+            strsql += " Where ArtID = @ArtID";
 
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            using (var conn = _util.GetSqlConnection())
             {
-                conn.Execute(strSQL, new
-                {
-                    ArtID = art.ArtID,
-                    Title = art.Title,
-                    ArtContent = art.ArtContent,
-                    UpdateTime = DateTime.Now
-                });
+                art.UpdateTime = DateTime.Now;
+                conn.Execute(strsql,art);
             }
             
         }
@@ -333,86 +337,85 @@ namespace VIncentApplication.Models
         /// <param name="art"></param>
         private void InsertArtDb(Art art)
         {
-            string strSQL = @" Insert into [Art] ([Title],[ArtContent],[CreateTime],[UserID]) value (@Title , @ArtContent, @CreateTime,@UserID ) ";
+            string strsql = @" Insert into [Art] ([Title],[ArtContent],[CreateTime],[UserID]) values (@Title , @ArtContent, @CreateTime,@UserID ) ";
 
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            using (var conn = _util.GetSqlConnection())
             {
-                conn.Execute(strSQL, new
-                {
-                    Title = art.Title,
-                    ArtContent = art.ArtContent,
-                    CreateTime = DateTime.Now,
-                    UserID = HttpContext.Current.Session["UserID"]
-                });
+                art.UserID = HttpContext.Current.Session["UserID"].ToString();
+                art.CreateTime = DateTime.Now;
+                conn.Execute(strsql,art);
             }
         }
+
+
+
         /// <summary>
         /// 刪除文章DB
         /// </summary>
-        /// <param name="ArtID"></param>
-        private void DeleteArtDB(int ArtID)
+        /// <param name="artId"></param>
+        private void DeleteArtDB(int artId)
         {
-            string strSQL = @" Update [Art] Set [VisibleStatus] = 0 where [ArtID] = @ArtID ";
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            string strsql = @" Update [Art] Set [VisibleStatus] = 0 where [ArtID] = @ArtID ";
+            using (var conn = _util.GetSqlConnection())
             {
-                conn.Execute(strSQL, new
+                conn.Execute(strsql, new
                 {
-                    ArtID = ArtID
+                    ArtID = artId
                 });
             }
         }
         /// <summary>
         /// session使用者是否喜歡此文章
         /// </summary>
-        /// <param name="ArtID"></param>
+        /// <param name="artId"></param>
         /// <returns></returns>
-        public bool UserLikeThis(int ArtID)
+        public bool UserLikeThis(int artId)
         {
             string strSql = " Select 1 from [ArtLike] where [ArtID]=@ArtID and [UserID]=@UserID ";
-            using(SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            using(var conn = _util.GetSqlConnection())
             {
-                int resultCount = conn.QuerySingleOrDefault<int>(strSql, new
+                int result = conn.QuerySingleOrDefault<int>(strSql, new
                 {
-                    ArtID = ArtID,
+                    ArtID = artId,
                     UserID = HttpContext.Current.Session["UserID"]
                 });
-                return resultCount > 0;
+                return result > 0;
             }
         }
         /// <summary>
         /// 取得點讚數有快取拿快取 沒快取拿DB
         /// </summary>
-        /// <param name="ArtID"></param>
+        /// <param name="artId"></param>
         /// <returns></returns>
-        public int GetArtLikeNumber(int ArtID)
+        public int GetArtLikeNumber(int artId)
         {
-            string ArtLikeKey = $"ArtLike_{ArtID}";
+            string artlikekey = $"ArtLike_{artId}";
             var redis = RedisConnectorHelper.Connection.GetDatabase();
-            if (redis.StringGet(ArtLikeKey).HasValue)
+            if (redis.StringGet(artlikekey).HasValue)
             {
-                return Convert.ToInt32(redis.StringGet(ArtLikeKey));
+                return Convert.ToInt32(redis.StringGet(artlikekey));
             }
             else
             {
-                int DBLikes = SelectArtLikeNumberDB(ArtID);
-                redis.StringSet(ArtLikeKey, DBLikes, TimeSpan.FromSeconds(60));
-                return DBLikes;
+                int dblikes = SelectArtLikeNumberDB(artId);
+                redis.StringSet(artlikekey, dblikes, TimeSpan.FromSeconds(60));
+                return dblikes;
             }
 
         }
         /// <summary>
         /// 抓DB文章點讚數
         /// </summary>
-        /// <param name="ArtID"></param>
+        /// <param name="artId"></param>
         /// <returns></returns>
-        private int SelectArtLikeNumberDB(int ArtID)
+        private int SelectArtLikeNumberDB(int artId)
         {
-            string strSql = " Select Count(*) as LikeNumber from [ArtLike] where [ArtID]=@ArtID ";
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            string strsql = " Select Count(*) as LikeNumber from [ArtLike] where [ArtID]=@ArtID ";
+            using (var conn = _util.GetSqlConnection())
             {
-                Art result = conn.QuerySingle<Art>(strSql, new
+                Art result = conn.QuerySingle<Art>(strsql, new
                 {
-                    ArtID = ArtID,
+                    ArtID = artId,
                     UserID = HttpContext.Current.Session["UserID"]
                 });
                 return result.LikeNumber;
@@ -421,72 +424,61 @@ namespace VIncentApplication.Models
         /// <summary>
         /// 已點讚刪除讚紀錄 沒點讚新增讚紀錄
         /// </summary>
-        /// <param name="ArtID"></param>
-        public void LikeClick(int ArtID)
+        /// <param name="artId"></param>
+        public void LikeClick(int artId)
         {
+            Art artDb = GetArt(artId);
             var redis = RedisConnectorHelper.Connection.GetDatabase();
-            string ArtLikeKey = $"ArtLike_{ArtID}";
+            string artlikekey = $"ArtLike_{artId}";
             try
             {
-                if (UserLikeThis(ArtID))
+                if (UserLikeThis(artId))
                 {
-                    DeleteArtLikeDB(ArtID);
-                    redis.StringDecrement(ArtLikeKey);
+                    DeleteArtLikeDB(artDb);
+                    redis.StringDecrement(artlikekey,1);
                 }
                 else
                 {
-                    InsertArtLikeDB(ArtID);
-                    redis.StringIncrement(ArtLikeKey);
+                    InsertArtLikeDB(artDb);
+                    redis.StringIncrement(artlikekey,1);
                 }
             }
             catch (Exception ex)
             {
 
-                Util util = new Util();
-                util.DeBug(ex.Message);
+                _util.DeBug(ex.Message);
             }
 
         }
         /// <summary>
         /// 新增點讚數至DB
         /// </summary>
-        /// <param name="ArtID"></param>
-        private void InsertArtLikeDB(int ArtID)
+        /// <param name="artId"></param>
+        private void InsertArtLikeDB(Art art)
         {
-            string strSql = " Insert into [ArtLike] ([UserID],[ArtID],[CreateTime]) values (@UserID,@ArtID,@CreateTime) ";
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            string strsql = " Insert into [ArtLike] ([UserID],[ArtID],[CreateTime]) values (@UserID,@ArtID,@CreateTime) ";
+            using (var conn = _util.GetSqlConnection())
             {
-                Art result = conn.QuerySingleOrDefault<Art>(strSql, new
-                {
-                    ArtID = ArtID,
-                    UserID = HttpContext.Current.Session["UserID"],
-                    CreateTime = DateTime.Now
-                });
+                conn.Execute(strsql, art);
             }
         }
         /// <summary>
         /// 刪除DB點讚數
         /// </summary>
-        /// <param name="ArtID"></param>
-        private void DeleteArtLikeDB(int ArtID)
+        /// <param name="artId"></param>
+        private void DeleteArtLikeDB(Art art)
         {
-            string strSql = "Delete [ArtLike]  Where [ArtID] = @ArtID and [UserID] = @UserID ";
+            string strsql = "Delete [ArtLike]  Where [ArtID] = @ArtID and [UserID] = @UserID ";
             try
             {
-                using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+                using (var conn = _util.GetSqlConnection())
                 {
-                    Art result = conn.QuerySingle<Art>(strSql, new
-                    {
-                        ArtID = ArtID,
-                        UserID = HttpContext.Current.Session["UserID"],
-                        Updatetime = DateTime.Now
-                    });
+                     conn.Execute(strsql, art);
                 }
             }
             catch (Exception ex)
             {
-                Util util = new Util();
-                util.DeBug(ex.Message);
+                _util.DeBug(ex.Message);
             }
 
         }

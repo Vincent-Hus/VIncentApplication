@@ -13,23 +13,7 @@ namespace VIncentApplication.Models
 {
     public class AccountDataAccess
     {
-        /// <summary>
-        /// 判斷帳號是否重複
-        /// </summary>
-        /// <param name="UserID"></param>
-        /// <returns>bool</returns>
-        private bool HaveSameAccount(string UserID)
-        {
-            string strSQL = " Select 1 from [ApplicationUser] Where [UserID] = @UserID";
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
-            {
-                int result = conn.Query<int>(strSQL, new
-                {
-                    UserID = UserID
-                }).SingleOrDefault();
-                return result > 0;
-            }
-        }
+        private readonly Util _util = new Util();
         /// <summary>
         /// 註冊帳號
         /// </summary>
@@ -37,18 +21,18 @@ namespace VIncentApplication.Models
         /// <returns>型別:string 內容:結果訊息</returns>
         public string RegisterAccount(Register register)
         {
-            if (this.HaveSameAccount(register.UserID)) 
+            if (HaveSameAccount(register.UserID)) 
             { 
                 return "使用者重複"; 
             }
 
             byte[]  salt = this.CreateSalt();
-            string saltStr = Convert.ToBase64String(salt);
-            string hashPassword = this.HashPassword(register.Password, salt);
+            string saltstr = Convert.ToBase64String(salt);
+            string hashpassword = this.HashPassword(register.Password, salt);
 
             try
             {
-                InsertUserDB(register, hashPassword, saltStr);
+                InsertUserDB(register, hashpassword, saltstr);
                 return "註冊成功";
             }
             catch (Exception ex)
@@ -71,9 +55,9 @@ namespace VIncentApplication.Models
                 try
                 {
                     byte[] salt = GetSalt(login.UserID);
-                    string hashPassword = HashPassword(login.Password, salt);
+                    string hashpassword = HashPassword(login.Password, salt);
 
-                    return HasUserInDB(login, hashPassword);
+                    return HasUserInDB(login, hashpassword);
                 }
                 catch (Exception ex)
                 {
@@ -89,18 +73,15 @@ namespace VIncentApplication.Models
         /// <summary>
         /// 取得該帳號的鹽
         /// </summary>
-        /// <param name="UserID"></param>
+        /// <param name="userId"></param>
         /// <returns>byte[]</returns>
-        private byte[] GetSalt(string UserID)
+        private byte[] GetSalt(string userId)
         {
-            string strSQL = "Select [Salt] from [ApplicationUser] Where [UserID] = @UserID";
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            string strsql = "Select [Salt] from [ApplicationUser] Where [UserID] = @UserID";
+            using (var conn = _util.GetSqlConnection())
             {
                 
-                Login result = conn.QuerySingle<Login>(strSQL, new
-                {
-                    UserID = UserID
-                });
+                Login result = conn.QuerySingle<Login>(strsql,new Login { UserID = userId});
                 return Convert.FromBase64String(result.Salt);
             }
 
@@ -127,38 +108,51 @@ namespace VIncentApplication.Models
 
             return Convert.ToBase64String(argon2.GetBytes(16));
         }
-        private void InsertUserDB(Register register ,string hashPassword ,string saltStr)
+        private void InsertUserDB(Register register ,string hashPassword ,string strSalt)
         {
-            string strSQL = "Insert into [ApplicationUser] ";
-            strSQL += " ([UserID],[Password],[Salt],[Email],[CreateTime]) ";
-            strSQL += " values ";
-            strSQL += " (@UserID,@Password,@Salt,@Email,@CreateTime) ";
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            string strsql = "Insert into [ApplicationUser] ";
+            strsql += " ([UserID],[Password],[Salt],[Email],[CreateTime]) ";
+            strsql += " values ";
+            strsql += " (@UserID,@Password,@Salt,@Email,@CreateTime) ";
+            using (var conn = _util.GetSqlConnection())
             {
-                conn.Execute(strSQL, new
-                {
-                    UserID = register.UserID,
-                    Password = hashPassword,
-                    Salt = saltStr,
-                    Email = register.Email,
-                    CreateTime = DateTime.Now
-                });
+                register.CreateTime = DateTime.Now;
+                register.Password = hashPassword;
+                register.Salt = strSalt;
+                conn.Execute(strsql,register);
             }
             
         }
         private bool HasUserInDB(Login login, string hashPassword)
         {
-            string strSQL = "Select 1 From [ApplicationUser] Where UserID = @UserID and Password = @Password ";
-            using (SqlConnection conn = new SqlConnection(ConfigurationManager.ConnectionStrings["DbConnectionString"].ConnectionString))
+            string strsql = "Select 1 From [ApplicationUser] Where UserID = @UserID and Password = @Password ";
+            using (var conn = _util.GetSqlConnection())
             {
 
-                int result = conn.Query<int>(strSQL, new
+                int result = conn.Query<int>(strsql, new
                 {
                     UserID = login.UserID,
                     Password = hashPassword
                 }).SingleOrDefault();
                 return result > 0;
             }
-        } 
+        }
+        /// <summary>
+        /// 判斷帳號是否重複
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <returns>bool</returns>
+        private bool HaveSameAccount(string userId)
+        {
+            string strSQL = " Select 1 from [ApplicationUser] Where [UserID] = @UserID";
+            using (var conn = _util.GetSqlConnection())
+            {
+                int result = conn.Query<int>(strSQL, new { UserID = userId }).SingleOrDefault();
+
+                //bool result2 = conn.Query<Login>(strSQL, new { UserID = UserID }).Any();
+
+                return result > 0;
+            }
+        }
     }
 }
